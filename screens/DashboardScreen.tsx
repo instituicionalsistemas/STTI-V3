@@ -311,7 +311,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onLogout, companyId }
                 user={selectedProspectUser} 
                 onBack={() => setSelectedProspectUser(null)} 
                 onLogout={onLogout}
-                showBackButton={companyFeatures.length > 1}
+                showBackButton={true}
             />;
         }
         return (
