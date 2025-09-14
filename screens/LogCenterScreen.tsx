@@ -52,7 +52,7 @@ const LogCenterScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const filteredLogs = useMemo(() => {
         return logs.filter(log => {
             if (filters.logType && log.type !== filters.logType) return false;
-            if (filters.companyId && log.companyId !== filters.companyId) return false;
+            if (filters.companyId && log.company_id !== filters.companyId) return false;
             
             const logDate = new Date(log.timestamp);
             if (filters.startDate) {
@@ -96,7 +96,8 @@ const LogCenterScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }, {} as Record<string, number>);
 
         return Object.entries(logCounts)
-            .map(([timestamp, count]): [number, number] => [new Date(timestamp).getTime(), count])
+            // FIX: Cast count to number to resolve TypeScript error.
+            .map(([timestamp, count]): [number, number] => [new Date(timestamp).getTime(), count as number])
             .sort((a, b) => a[0] - b[0]);
 
     }, [filteredLogs]);

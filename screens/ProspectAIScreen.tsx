@@ -14,12 +14,15 @@ import Modal from '../components/Modal';
 import UserProfileForm from '../components/forms/UserProfileForm';
 import ChangePasswordForm from '../components/forms/ChangePasswordForm';
 import { formatTimeUntil } from '../utils/dateUtils';
+import ReassignLeadModal from '../components/modals/ReassignLeadModal';
 
 interface ProspectAIScreenProps {
     onBack: () => void;
     user: TeamMember;
     onLogout: () => void;
     showBackButton?: boolean;
+    isManagerView?: boolean;
+    allSalespeople?: TeamMember[];
 }
 
 const ProspectCard: React.FC<{ title: string; count: number; color: string; }> = ({ title, count, color }) => {
@@ -43,19 +46,23 @@ const ProspectColumn: React.FC<{ title: string; count: number; children: React.R
 };
 
 
-const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLogout, showBackButton = true }) => {
+const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLogout, showBackButton = true, isManagerView = false, allSalespeople = [] }) => {
     const { 
         prospectaiLeads, 
         updateProspectLeadStatus,
+        reassignProspectLead,
         companies,
         notifications,
         markNotificationAsRead,
-        addNotification
+        addNotification,
+        teamMembers,
     } = useData();
     const [prospectingLead, setProspectingLead] = useState<ProspectAILead | null>(null);
     const [isPerformanceView, setIsPerformanceView] = useState(false);
     const [isEditProfileModalOpen, setEditProfileModalOpen] = useState(false);
     const [isChangePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
+    const [leadToReassign, setLeadToReassign] = useState<ProspectAILead | null>(null);
+
 
     // APPOINTMENT NOTIFICATION LOGIC
     useEffect(() => {
@@ -106,30 +113,42 @@ const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLog
     }, [user.id, prospectaiLeads, addNotification]);
 
     const myLeads = useMemo(() => {
-        return prospectaiLeads.filter(lead => lead.salespersonId === user.id);
+        // A pipeline de um usuário inclui leads atualmente atribuídos a ele,
+        // E leads que foram remanejados a partir dele (que agora pertencem a outra pessoa).
+        return prospectaiLeads.filter(lead => 
+            lead.salespersonId === user.id || 
+            lead.details?.reassigned_from === user.id
+        );
     }, [prospectaiLeads, user.id]);
     
     const activeCompany = useMemo(() => companies.find(c => c.id === user.companyId), [companies, user.companyId]);
     const userNotifications = useMemo(() => notifications.filter(n => (n.recipientRole === 'salesperson' && !n.userId) || n.userId === user.id), [notifications, user.id]);
 
     const categorizedLeads = useMemo(() => {
-        const categorized: { [key: string]: any[] } = {
-            'Novo Lead': [],
-            'Em Contato': [],
-            'Segunda Tentativa': [],
-            'Terceira Tentativa': [],
-            'Agendado': [],
-            'Finalizado - Convertido': [],
-            'Finalizado - Não Convertido': [],
-            'Remanejado': []
+        const initialCategories: Record<LeadStatus, ProspectAILead[]> = {
+            'Novo Lead': [], 'Em Contato': [], 'Segunda Tentativa': [], 'Terceira Tentativa': [],
+            'Agendado': [], 'Finalizado - Convertido': [], 'Finalizado - Não Convertido': [], 'Remanejado': []
         };
+
         myLeads.forEach(lead => {
-            if (categorized[lead.status]) {
-                categorized[lead.status].push(lead);
+            if (lead.status === 'Remanejado') {
+                // Se foi remanejado PARA mim, é um novo lead.
+                if (lead.salespersonId === user.id) {
+                    initialCategories['Novo Lead'].push(lead);
+                } 
+                // Se foi remanejado DE mim, vai para a coluna de remanejados.
+                else if (lead.details?.reassigned_from === user.id) {
+                    initialCategories['Remanejado'].push(lead);
+                }
+            } else if (lead.salespersonId === user.id) {
+                // Categorização normal para meus outros leads.
+                 if (initialCategories[lead.status]) {
+                    initialCategories[lead.status].push(lead);
+                }
             }
         });
-        return categorized;
-    }, [myLeads]);
+        return initialCategories;
+    }, [myLeads, user.id]);
 
     const hasLeadInProgress = useMemo(() => {
         return categorizedLeads['Em Contato'].length > 0;
@@ -141,9 +160,17 @@ const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLog
             setProspectingLead(null);
         }
     };
+    
+    const handleConfirmReassignment = async (newOwnerId: string) => {
+        if (leadToReassign) {
+            await reassignProspectLead(leadToReassign.id, newOwnerId, leadToReassign.salespersonId);
+            setLeadToReassign(null);
+        }
+    };
 
-    const counts = {
-        total: myLeads.length,
+
+    const counts = useMemo(() => ({
+        total: myLeads.filter(l => l.salespersonId === user.id).length,
         converted: categorizedLeads['Finalizado - Convertido'].length,
         inProgress: categorizedLeads['Em Contato'].length + categorizedLeads['Agendado'].length,
         notConverted: categorizedLeads['Finalizado - Não Convertido'].length,
@@ -154,7 +181,7 @@ const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLog
         thirdAttempt: categorizedLeads['Terceira Tentativa'].length,
         scheduled: categorizedLeads['Agendado'].length,
         finished: categorizedLeads['Finalizado - Convertido'].length + categorizedLeads['Finalizado - Não Convertido'].length,
-    };
+    }), [myLeads, user.id, categorizedLeads]);
 
     const placeholderCard = (
         <div className="border-2 border-dashed border-dark-border rounded-lg p-8 text-center text-dark-secondary">
@@ -222,34 +249,34 @@ const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLog
             </div>
 
             {/* Kanban Columns */}
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-6">
                 <ProspectColumn title="Novos Leads" count={counts.new}>
                     {categorizedLeads['Novo Lead'].length > 0
-                        ? categorizedLeads['Novo Lead'].map(lead => <LeadCard key={lead.id} lead={lead} onClick={() => setProspectingLead(lead)} isDisabled={hasLeadInProgress} />)
+                        ? categorizedLeads['Novo Lead'].map(lead => <LeadCard key={lead.id} lead={lead} onClick={() => setProspectingLead(lead)} isDisabled={hasLeadInProgress} isManagerView={isManagerView} onReassign={setLeadToReassign} />)
                         : placeholderCard
                     }
                 </ProspectColumn>
                 <ProspectColumn title="Em Contato" count={counts.contact}>
                     {categorizedLeads['Em Contato'].length > 0
-                        ? categorizedLeads['Em Contato'].map(lead => <LeadCard key={lead.id} lead={lead} />)
+                        ? categorizedLeads['Em Contato'].map(lead => <LeadCard key={lead.id} lead={lead} isManagerView={isManagerView} onReassign={setLeadToReassign} allSalespeople={teamMembers} />)
                         : placeholderCard
                     }
                 </ProspectColumn>
                  <ProspectColumn title="Segunda Tentativa" count={counts.secondAttempt}>
                     {categorizedLeads['Segunda Tentativa'].length > 0
-                        ? categorizedLeads['Segunda Tentativa'].map(lead => <LeadCard key={lead.id} lead={lead} />)
+                        ? categorizedLeads['Segunda Tentativa'].map(lead => <LeadCard key={lead.id} lead={lead} isManagerView={isManagerView} onReassign={setLeadToReassign} allSalespeople={teamMembers} />)
                         : placeholderCard
                     }
                 </ProspectColumn>
                  <ProspectColumn title="Terceira Tentativa" count={counts.thirdAttempt}>
                     {categorizedLeads['Terceira Tentativa'].length > 0
-                        ? categorizedLeads['Terceira Tentativa'].map(lead => <LeadCard key={lead.id} lead={lead} />)
+                        ? categorizedLeads['Terceira Tentativa'].map(lead => <LeadCard key={lead.id} lead={lead} isManagerView={isManagerView} onReassign={setLeadToReassign} allSalespeople={teamMembers} />)
                         : placeholderCard
                     }
                 </ProspectColumn>
                 <ProspectColumn title="Agendados" count={counts.scheduled}>
                      {categorizedLeads['Agendado'].length > 0
-                        ? categorizedLeads['Agendado'].map(lead => <LeadCard key={lead.id} lead={lead} />)
+                        ? categorizedLeads['Agendado'].map(lead => <LeadCard key={lead.id} lead={lead} isManagerView={isManagerView} onReassign={setLeadToReassign} allSalespeople={teamMembers}/>)
                         : placeholderCard
                     }
                 </ProspectColumn>
@@ -257,7 +284,13 @@ const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLog
                     {(categorizedLeads['Finalizado - Convertido'].length > 0 || categorizedLeads['Finalizado - Não Convertido'].length > 0)
                         ? [...categorizedLeads['Finalizado - Convertido'], ...categorizedLeads['Finalizado - Não Convertido']]
                             .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                            .map(lead => <LeadCard key={lead.id} lead={lead} />)
+                            .map(lead => <LeadCard key={lead.id} lead={lead} isManagerView={isManagerView} allSalespeople={teamMembers} />)
+                        : placeholderCard
+                    }
+                </ProspectColumn>
+                <ProspectColumn title="Remanejados" count={counts.reallocated}>
+                     {categorizedLeads['Remanejado'].length > 0
+                        ? categorizedLeads['Remanejado'].map(lead => <LeadCard key={lead.id} lead={lead} isReassignedAwayView={true} isManagerView={isManagerView} allSalespeople={teamMembers} />)
                         : placeholderCard
                     }
                 </ProspectColumn>
@@ -273,6 +306,16 @@ const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLog
             >
                 Deseja mover o lead <strong className="text-dark-text">{prospectingLead?.leadName}</strong> para a etapa "Em Contato"?
             </ConfirmationModal>
+
+             {leadToReassign && (
+                <ReassignLeadModal
+                    isOpen={!!leadToReassign}
+                    onClose={() => setLeadToReassign(null)}
+                    lead={leadToReassign}
+                    salespeople={allSalespeople.filter(sp => sp.id !== leadToReassign.salespersonId)}
+                    onConfirm={handleConfirmReassignment}
+                />
+            )}
 
             <Modal isOpen={isEditProfileModalOpen} onClose={() => setEditProfileModalOpen(false)}>
                 <UserProfileForm initialData={user} onClose={() => setEditProfileModalOpen(false)} />

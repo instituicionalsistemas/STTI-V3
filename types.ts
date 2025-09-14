@@ -1,3 +1,4 @@
+
 export type Feature = 'estoque_inteligente' | 'prospectai' | 'marketing';
 
 export interface MaintenanceRecord {
@@ -147,15 +148,16 @@ export type LogType =
   | 'VEHICLE_SOLD'
   | 'VEHICLE_DELETED';
 
+// FIX: Added missing LogEntry interface
 export interface LogEntry {
-    id: string;
-    timestamp: string;
-    type: LogType;
-    description: string;
-    companyId?: string;
-    companyName?: string;
-    userId?: string;
-    userName?: string;
+  id: string;
+  timestamp: string;
+  type: LogType;
+  description: string;
+  company_id?: string;
+  user_id?: string;
+  companyName?: string;
+  userName?: string;
 }
 
 export type LeadStatus =
@@ -178,7 +180,12 @@ export interface ProspectAILead {
   interestVehicle?: string;
   status: LeadStatus;
   rawLeadData?: string;
-  details?: any; // JSONB can be flexible
+  details?: {
+    [key: string]: any;
+    reassigned_from?: string;
+    reassigned_to?: string;
+    reassigned_at?: string;
+  };
   appointment_at?: string;
   feedback?: {
     text: string;

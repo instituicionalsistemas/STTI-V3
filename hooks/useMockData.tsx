@@ -50,6 +50,7 @@ interface DataContextType {
     updateGrupoUserPassword: (groupId: string, currentPassword: string, newPassword: string) => Promise<{ success: boolean; message: string; }>;
     updateGrupoUserProfile: (groupId: string, data: { bannerUrl: string; responsiblePhotoUrl: string; }) => Promise<GrupoEmpresarial | null>;
     updateProspectLeadStatus: (leadId: string, status: LeadStatus, details?: Record<string, any>) => Promise<void>;
+    reassignProspectLead: (leadId: string, newSalespersonId: string, originalSalespersonId: string) => Promise<void>;
     addProspectLeadFeedback: (leadId: string, feedbackText: string, images: string[]) => Promise<void>;
     addGrupoEmpresarial: (grupo: Omit<GrupoEmpresarial, 'id' | 'companyIds' | 'createdAt' | 'isActive'>, password: string) => Promise<void>;
     updateGrupoEmpresarial: (grupo: Omit<GrupoEmpresarial, 'companyIds'>) => Promise<void>;
@@ -932,6 +933,34 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         ));
     };
 
+    const reassignProspectLead = async (leadId: string, newSalespersonId: string, originalSalespersonId: string) => {
+        const leadToUpdate = prospectaiLeads.find(l => l.id === leadId);
+        if (!leadToUpdate) return;
+        
+        const newDetails = {
+            ...(leadToUpdate.details || {}),
+            reassigned_from: originalSalespersonId,
+            reassigned_to: newSalespersonId,
+            reassigned_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabase
+            .from('prospectai')
+            .update({ 
+                salesperson_id: newSalespersonId,
+                status: 'Remanejado',
+                details: newDetails
+            })
+            .eq('id', leadId)
+            .select()
+            .single();
+
+        if (error) { console.error("Error reassigning lead:", error); return; }
+
+        const mappedUpdatedLead = mapProspectFromDB(data);
+        setProspectaiLeads(prev => prev.map(lead => lead.id === leadId ? mappedUpdatedLead : lead));
+    };
+
     const addProspectLeadFeedback = async (leadId: string, feedbackText: string, images: string[]) => {
         try {
             const imageUrls: string[] = [];
@@ -1210,6 +1239,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateGrupoUserPassword,
         updateGrupoUserProfile,
         updateProspectLeadStatus,
+        reassignProspectLead,
         addProspectLeadFeedback,
         addGrupoEmpresarial,
         updateGrupoEmpresarial,

@@ -1,6 +1,7 @@
 
+
 import React, { useState, ChangeEvent, FormEvent } from 'react';
-import { ProspectAILead, LeadStatus } from '../types';
+import { ProspectAILead, LeadStatus, TeamMember } from '../types';
 import Card from './Card';
 import { useData } from '../hooks/useMockData';
 import { UserCircleIcon } from './icons/UserCircleIcon';
@@ -18,11 +19,16 @@ import { XIcon } from './icons/XIcon';
 import { CalendarIcon } from './icons/CalendarIcon';
 import Modal from './Modal';
 import ImageLightbox from './ImageLightbox';
+import { ArrowRightIcon } from './icons/ArrowRightIcon';
 
 interface LeadCardProps {
     lead: ProspectAILead;
     onClick?: () => void;
     isDisabled?: boolean;
+    isManagerView?: boolean;
+    allSalespeople?: TeamMember[];
+    onReassign?: (lead: ProspectAILead) => void;
+    isReassignedAwayView?: boolean;
 }
 
 const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string | undefined | null; }> = ({ icon, label, value }) => {
@@ -56,7 +62,7 @@ const formatKeyToLabel = (key: string): string => {
         .join(' ');
 };
 
-const LeadCard: React.FC<LeadCardProps> = ({ lead, onClick, isDisabled = false }) => {
+const LeadCard: React.FC<LeadCardProps> = ({ lead, onClick, isDisabled = false, isManagerView = false, allSalespeople = [], onReassign, isReassignedAwayView = false }) => {
     const { addProspectLeadFeedback, updateProspectLeadStatus } = useData();
     const [isCopied, setIsCopied] = useState(false);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -71,7 +77,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onClick, isDisabled = false }
     const [expandedImageUrl, setExpandedImageUrl] = useState<string | null>(null);
 
     const appointmentTimestamp = lead.appointment_at || lead.details?.appointment_date;
-    const formattedDateTime = lead.status === 'Agendado' && appointmentTimestamp
+    const formattedDateTime = (lead.status === 'Agendado' || lead.status === 'Remanejado') && appointmentTimestamp
         ? new Date(appointmentTimestamp).toLocaleString('pt-BR', {
             day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
           })
@@ -139,29 +145,69 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onClick, isDisabled = false }
     };
 
     let statusBorderClass = '';
+    const isReassigned = !!lead.details?.reassigned_from;
+
     if (lead.status === 'Finalizado - Convertido') {
         statusBorderClass = 'border-2 border-green-500/60';
     } else if (lead.status === 'Finalizado - Não Convertido') {
         statusBorderClass = 'border-2 border-red-500/60';
+    } else if (isReassignedAwayView) {
+        statusBorderClass = 'border-2 border-purple-500/60 opacity-70';
+    } else if (isReassigned) { // This now correctly targets leads received from reassignment
+        statusBorderClass = 'border-2 border-purple-500/80';
     } else if (lead.status === 'Novo Lead') {
         statusBorderClass = 'border-2 border-dark-border';
     }
 
-    const isClickableForDetails = ['Agendado', 'Finalizado - Convertido', 'Finalizado - Não Convertido'].includes(lead.status);
+    const isFinalized = lead.status.startsWith('Finalizado');
+    const isClickableForManager = isManagerView && !isFinalized;
+    const isClickableForUser = !isManagerView && (lead.status === 'Agendado' || isFinalized);
+    const isClickableForProspecting = !isDisabled && lead.status === 'Novo Lead' && onClick;
 
     const handleCardClick = () => {
-        if (isClickableForDetails) {
+        if (isClickableForManager || isClickableForUser) {
             setIsDetailModalOpen(true);
-        } else if (!isDisabled && lead.status === 'Novo Lead' && onClick) {
-            onClick();
+        } else if (isClickableForProspecting) {
+            onClick?.();
         }
     };
+    
+    const handleReassignClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onReassign) {
+            onReassign(lead);
+        }
+        setIsDetailModalOpen(false); // Close current modal to open the next one
+    };
+
 
     const cardClassName = `p-4 transition-all duration-300 animate-fade-in ${
-        (isClickableForDetails || (!isDisabled && onClick && lead.status === 'Novo Lead')) ? 'cursor-pointer hover:border-dark-primary/50' : ''
+        (isClickableForManager || isClickableForUser || isClickableForProspecting) ? 'cursor-pointer hover:border-dark-primary/50' : ''
     } ${
         isDisabled && lead.status === 'Novo Lead' ? 'opacity-60 cursor-not-allowed' : ''
     } ${statusBorderClass}`;
+
+     if (isReassignedAwayView) {
+        const reassignedToName = allSalespeople.find(sp => sp.id === lead.salespersonId)?.name || 'outro vendedor';
+        return (
+             <Card className={cardClassName}>
+                <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-dark-background border border-dark-border flex items-center justify-center">
+                        <UserCircleIcon className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-dark-text line-through">{lead.leadName}</h4>
+                        <p className="text-xs text-dark-secondary">{new Date(lead.details?.reassigned_at || lead.createdAt).toLocaleString('pt-BR')}</p>
+                    </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-dark-border text-center">
+                    <p className="text-sm font-semibold text-purple-400 flex items-center justify-center gap-2">
+                        <ArrowRightIcon /> Remanejado para {reassignedToName}
+                    </p>
+                </div>
+             </Card>
+        )
+    }
 
     return (
         <>
@@ -392,7 +438,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onClick, isDisabled = false }
                             )}
                             <DetailItem icon={<CarIcon className="w-4 h-4" />} label="Veículo de Interesse" value={lead.interestVehicle} />
                             {lead.details && Object.entries(lead.details).map(([key, value]) => {
-                                if (!value || (typeof value !== 'string' && typeof value !== 'number') || key === 'appointment_date') return null;
+                                if (!value || (typeof value !== 'string' && typeof value !== 'number') || key.startsWith('reassigned_') || key === 'appointment_date') return null;
                                 const config = detailConfig[key];
                                 const label = config ? config.label : formatKeyToLabel(key);
                                 const IconComponent = config ? config.icon : DocumentTextIcon;
@@ -423,6 +469,17 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onClick, isDisabled = false }
                             </div>
                         )}
                     </div>
+                    {isManagerView && onReassign && !isFinalized && (
+                        <div className="mt-6 pt-4 border-t border-dark-border">
+                             <button
+                                onClick={handleReassignClick}
+                                className="w-full flex items-center justify-center gap-2 text-sm font-bold py-2.5 px-3 rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-colors"
+                            >
+                                <SwitchHorizontalIcon className="w-4 h-4" />
+                                Remanejar Lead
+                            </button>
+                        </div>
+                    )}
                 </div>
             </Modal>
 
