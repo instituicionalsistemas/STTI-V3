@@ -170,7 +170,7 @@ const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLog
 
 
     const counts = useMemo(() => ({
-        total: myLeads.filter(l => l.salespersonId === user.id).length,
+        total: myLeads.length,
         converted: categorizedLeads['Finalizado - Convertido'].length,
         inProgress: categorizedLeads['Em Contato'].length + categorizedLeads['Agendado'].length,
         notConverted: categorizedLeads['Finalizado - Não Convertido'].length,
@@ -181,7 +181,7 @@ const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLog
         thirdAttempt: categorizedLeads['Terceira Tentativa'].length,
         scheduled: categorizedLeads['Agendado'].length,
         finished: categorizedLeads['Finalizado - Convertido'].length + categorizedLeads['Finalizado - Não Convertido'].length,
-    }), [myLeads, user.id, categorizedLeads]);
+    }), [myLeads, categorizedLeads]);
 
     const placeholderCard = (
         <div className="border-2 border-dashed border-dark-border rounded-lg p-8 text-center text-dark-secondary">
@@ -284,7 +284,7 @@ const ProspectAIScreen: React.FC<ProspectAIScreenProps> = ({ onBack, user, onLog
                     {(categorizedLeads['Finalizado - Convertido'].length > 0 || categorizedLeads['Finalizado - Não Convertido'].length > 0)
                         ? [...categorizedLeads['Finalizado - Convertido'], ...categorizedLeads['Finalizado - Não Convertido']]
                             .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                            .map(lead => <LeadCard key={lead.id} lead={lead} isManagerView={isManagerView} allSalespeople={teamMembers} />)
+                            .map(lead => <LeadCard key={lead.id} lead={lead} isManagerView={isManagerView} allSalespeople={teamMembers} onReassign={setLeadToReassign} />)
                         : placeholderCard
                     }
                 </ProspectColumn>

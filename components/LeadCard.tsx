@@ -160,7 +160,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onClick, isDisabled = false, 
     }
 
     const isFinalized = lead.status.startsWith('Finalizado');
-    const isClickableForManager = isManagerView && !isFinalized;
+    const isClickableForManager = isManagerView;
     const isClickableForUser = !isManagerView && (lead.status === 'Agendado' || isFinalized);
     const isClickableForProspecting = !isDisabled && lead.status === 'Novo Lead' && onClick;
 
@@ -451,7 +451,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onClick, isDisabled = false, 
                                 <h3 className="text-lg font-semibold text-dark-text mb-3">Histórico de Feedback</h3>
                                 <div className="space-y-3">
                                     {lead.feedback.slice().reverse().map((fb, index) => (
-                                        <div key={index} className="p-3 bg-dark-background/50 rounded-md border border-dark-border/50">
+                                        <div key={index} className={`p-3 bg-dark-background/50 rounded-md border ${isFinalized ? (lead.status === 'Finalizado - Convertido' ? 'border-green-500/60' : 'border-red-500/60') : 'border-dark-border/50'}`}>
                                             <p className="whitespace-pre-wrap text-sm text-dark-text">{fb.text}</p>
                                             {fb.images && fb.images.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 mt-2">
@@ -469,7 +469,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onClick, isDisabled = false, 
                             </div>
                         )}
                     </div>
-                    {isManagerView && onReassign && !isFinalized && (
+                    {isManagerView && onReassign && (
                         <div className="mt-6 pt-4 border-t border-dark-border">
                              <button
                                 onClick={handleReassignClick}
