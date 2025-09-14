@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="https://aisfizoyfpcisykarrnt.supabase.co/storage/v1/object/public/imagens/LOGO%20TRIAD3%20.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gerenciador Veicular Pro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            colors: {
+              light: { // Mantido para referência, mas o foco é no dark theme.
+                background: '#F9FAFB',
+                card: '#FFFFFF',
+                text: '#1F2937',
+                primary: '#00AEEF',
+                secondary: '#6B7280',
+                border: '#E5E7EB',
+                accent: '#F59E0B',
+              },
+              dark: {
+                background: '#0A0F1E', // Azul noite profundo
+                card: '#10182C', // Azul escuro para cards
+                text: '#E0E0E0', // Texto principal (cinza claro)
+                primary: '#00D1FF', // Ciano neon (cor de destaque)
+                secondary: '#8A93A3', // Texto secundário (cinza azulado)
+                border: '#243049', // Bordas sutis
+                accent: '#FBBF24',
+              }
+            },
+            borderRadius: {
+              '2xl': '1rem',
+              '3xl': '1.5rem',
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-in-out',
+              'modal-fade-in': 'modalFadeIn 0.3s ease-in-out',
+              'stagger': 'stagger 0.5s ease-in-out forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: 0, transform: 'translateY(-10px)' },
+                '100%': { opacity: 1, transform: 'translateY(0)' },
+              },
+              modalFadeIn: {
+                '0%': { opacity: 0, transform: 'scale(0.95)' },
+                '100%': { opacity: 1, transform: 'scale(1)' },
+              },
+              stagger: {
+                '0%': { opacity: 0, transform: 'translateY(20px)' },
+                '100%': { opacity: 1, transform: 'translateY(0)' },
+              },
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.2",
+    "@splinetool/react-spline": "https://esm.sh/@splinetool/react-spline@4.0.0",
+    "@splinetool/runtime": "https://esm.sh/@splinetool/runtime@1.9.1",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "echarts": "https://esm.sh/echarts@5.5.0",
+    "echarts-for-react": "https://esm.sh/echarts-for-react@3.0.2"
+  }
+}
+</script>
+<script>
+  // Proteção anti-DevTools aprimorada
+  (function() {
+    // Função para detectar dispositivos móveis e tablets de forma mais confiável.
+    // O objetivo é desativar as proteções nesses dispositivos para evitar falsos positivos,
+    // como o bloqueio indevido em iPhones ou iPads quando a barra de endereço/navegação
+    // do navegador é exibida ou ocultada.
+    function isMobileOrTablet() {
+      const userAgent = navigator.userAgent;
+
+      // 1. Verificação padrão via User Agent para a maioria dos celulares.
+      if (/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)) {
+        return true;
+      }
+
+      // 2. Detecção específica para iPads (com iPadOS 13+) que se identificam como um desktop Mac.
+      // Esses dispositivos reportam `navigator.platform` como 'MacIntel', mas possuem
+      // capacidade de toque (`maxTouchPoints > 1`), o que os diferencia de um Mac real.
+      if (/iPad/i.test(userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+        return true;
+      }
+
+      return false;
+    }
+
+    // Se for um dispositivo móvel ou tablet, o script de proteção é interrompido.
+    if (isMobileOrTablet()) {
+      return;
+    }
+
+    // As proteções abaixo serão executadas APENAS em DESKTOPS.
+
+    // Bloqueio de teclas de atalho comuns para abrir DevTools
+    document.addEventListener('keydown', function(e) {
+      if (
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'i') ||
+        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'j') ||
+        (e.ctrlKey && e.key.toLowerCase() === 'u') ||
+        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'c')
+      ) {
+        e.preventDefault();
+        return false;
+      }
+    });
+
+    // Impede o clique com o botão direito do mouse (menu de contexto)
+    document.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+    });
+
+    // Verifica periodicamente se as DevTools foram abertas medindo o tamanho da janela
+    const devToolsCheckInterval = setInterval(function() {
+      const darkBg = '#0A0F1E'; // Cor de fundo do tema escuro para consistência
+      const textColor = '#E0E0E0'; // Cor de texto do tema escuro
+      const fontFamily = 'Inter, sans-serif'; // Fonte do sistema
+      
+      if (window.outerHeight - window.innerHeight > 200 || window.outerWidth - window.innerWidth > 200) {
+        // Se a diferença de tamanho for suspeita, bloqueia o acesso
+        document.body.innerHTML = `<div style="background-color: ${darkBg}; color: ${textColor}; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: ${fontFamily};">
+                                            <h1 style="text-align:center; font-size: 2rem;">Acesso Bloqueado ❌</h1>
+                                          </div>`;
+        // Interrompe a verificação para economizar recursos
+        clearInterval(devToolsCheckInterval);
+      }
+    }, 1000);
+  })();
+</script>
+</head>
+  <body class="bg-light-background dark:bg-dark-background font-sans">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
